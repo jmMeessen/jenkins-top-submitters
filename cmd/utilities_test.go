@@ -226,6 +226,172 @@ func Test_writeMarkdownFile(t *testing.T) {
 	assert.True(t, isFileEquivalent(testOutputFilename, goldenMarkdownFilename))
 }
 
+func Test_writeHistoryOutput(t *testing.T) {
+	// Setup environment
+	inputPivotTableName := "../test_data/overview.csv"
+	tempDir := t.TempDir()
+	goldenHistoryFilename, err := duplicateFile("../test_data/historicExtract_reference.csv", tempDir)
+
+	assert.NoError(t, err, "Unexpected File duplication error")
+	assert.NotEmpty(t, goldenHistoryFilename, "Failure to duplicate test file")
+
+	// Setup input data
+	testOutputFilename := tempDir + "/history_output.csv"
+	data := [][]string{
+		{"Submitter", "Total_PRs"},
+		{"basil", "1245"},
+		{"MarkEWaite", "1150"},
+		{"lemeurherve", "939"},
+		{"NotMyFault", "926"},
+		{"dduportal", "859"},
+		{"jonesbusy", "415"},
+		{"jglick", "378"},
+		{"smerle33", "353"},
+		{"timja", "250"},
+		{"uhafner", "215"},
+		{"gounthar", "208"},
+		{"mawinter69", "179"},
+		{"daniel-beck", "164"}}
+
+	// Execute function under test
+	writeErr := writeHistoryOutput(testOutputFilename, inputPivotTableName, data)
+	assert.NoError(t, writeErr, "Function under test returned an unexpected error")
+
+	// result validation
+	assert.True(t, isFileEquivalent(testOutputFilename, goldenHistoryFilename))
+}
+
+func Test_writeHistoryOutput_notFoundUser(t *testing.T) {
+	// Setup environment
+	inputPivotTableName := "../test_data/overview.csv"
+	tempDir := t.TempDir()
+
+	// Setup input data
+	testOutputFilename := tempDir + "/history_output.csv"
+	data := [][]string{
+		{"Submitter", "Total_PRs"},
+		{"basil", "1245"},
+		{"MarkEWaite", "1150"},
+		{"lemeurherve", "939"},
+		{"NotMyFault", "926"},
+		{"dduportal", "859"},
+		{"jonesbusy", "415"},
+		{"jglick", "378"},
+		{"smerle33", "353"},
+		{"timja", "250"},
+		{"uhafner", "215"},
+		{"unknownUser", "208"},
+		{"mawinter69", "179"},
+		{"daniel-beck", "164"}}
+
+	// Execute function under test
+	writeErr := writeHistoryOutput(testOutputFilename, inputPivotTableName, data)
+
+	assert.EqualErrorf(t, writeErr, "Supplied name (unknownUser) was not found in input pivot table file", "Function under test should have failed")
+
+}
+
+func Test_writeHistoryOutput_noTopUserData(t *testing.T) {
+	// Setup environment
+	inputPivotTableName := "../test_data/overview.csv"
+	tempDir := t.TempDir()
+
+	// Setup input data
+	testOutputFilename := tempDir + "/history_output.csv"
+	data := [][]string{
+		{"Submitter", "Total_PRs"},
+	}
+
+	// Execute function under test
+	writeErr := writeHistoryOutput(testOutputFilename, inputPivotTableName, data)
+
+	assert.EqualErrorf(t, writeErr, "The generated top user data seems empty.", "Function under test should have failed")
+}
+
+func Test_writeHistoryOutput_noPivotTableData(t *testing.T) {
+	// Setup environment
+	inputPivotTableName := "../test_data/noData_overview.csv"
+	tempDir := t.TempDir()
+
+	// Setup input data
+	testOutputFilename := tempDir + "/history_output.csv"
+	data := [][]string{
+		{"Submitter", "Total_PRs"},
+		{"basil", "1245"},
+		{"MarkEWaite", "1150"},
+		{"lemeurherve", "939"},
+		{"NotMyFault", "926"},
+		{"dduportal", "859"},
+		{"jonesbusy", "415"},
+		{"jglick", "378"},
+		{"smerle33", "353"},
+		{"timja", "250"},
+		{"uhafner", "215"},
+		{"unknownUser", "208"},
+		{"mawinter69", "179"},
+		{"daniel-beck", "164"}}
+
+	// Execute function under test
+	writeErr := writeHistoryOutput(testOutputFilename, inputPivotTableName, data)
+
+	assert.EqualErrorf(t, writeErr, "The pivot table (../test_data/noData_overview.csv) seems empty.", "Function under test should have failed")
+}
+
+func Test_getIndexInPivotTable(t *testing.T) {
+	testInputSlice := [][]string{
+		{"", "month_1", "month_2", "month_3"},
+		{"basil", "1245", "1", "2"},
+		{"MarkEWaite", "1150", "1", "2"},
+		{"lemeurherve", "939", "1", "2"},
+		{"NotMyFault", "926", "1", "2"},
+		{"dduportal", "859", "1", "2"},
+		{"jonesbusy", "415", "1", "2"},
+		{"jglick", "378", "1", "2"},
+		{"smerle33", "353", "1", "2"},
+		{"timja", "250", "1", "2"},
+		{"uhafner", "215", "1", "2"},
+		{"gounthar", "208", "1", "2"},
+		{"mawinter69", "179", "1", "2"},
+		{"daniel-beck", "164", "1", "2"}}
+
+	type args struct {
+		pivotRecords [][]string
+		name         string
+	}
+	tests := []struct {
+		name      string
+		args      args
+		wantIndex int
+	}{
+		{
+			"Happy case - 1",
+			args{pivotRecords: testInputSlice, name: "basil"},
+			1,
+		},
+		{
+			"Happy case - 2",
+			args{pivotRecords: testInputSlice, name: "uhafner"},
+			10,
+		},
+		{
+			"Happy case - 3",
+			args{pivotRecords: testInputSlice, name: "daniel-beck"},
+			13,
+		},
+		{
+			"notfound",
+			args{pivotRecords: testInputSlice, name: "jmm"},
+			-1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotIndex := getIndexInPivotTable(tt.args.pivotRecords, tt.args.name); gotIndex != tt.wantIndex {
+				t.Errorf("getIndexInPivotTable() = %v, want %v", gotIndex, tt.wantIndex)
+			}
+		})
+	}
+}
 func Test_CheckDir(t *testing.T) {
 	type args struct {
 		file string
@@ -250,6 +416,55 @@ func Test_CheckDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := CheckDir(tt.args.file); (err != nil) != tt.wantErr {
 				t.Errorf("CheckDir() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_generateHistoryFilename(t *testing.T) {
+	type args struct {
+		outputFilename string
+		dataType       InputType
+		isCompare      bool
+	}
+	tests := []struct {
+		name                string
+		args                args
+		wantHistoryFilename string
+	}{
+		{
+			"Happy case - submitters",
+			args{
+				outputFilename: "output.md",
+				dataType:       InputTypeSubmitters,
+				isCompare:      false,
+			},
+			"./top_submitters_fullHistory.csv",
+		},
+		{
+			"Happy case - submitters - evolution",
+			args{
+				outputFilename: "output.md",
+				dataType:       InputTypeSubmitters,
+				isCompare:      true,
+			},
+			"./top_submitters_evolution_fullHistory.csv",
+		},
+		{
+			"Happy case - commenters - evolution - with path",
+			args{
+				outputFilename: "consolidated_data/output.md",
+				dataType:       InputTypeCommenters,
+				isCompare:      true,
+			},
+			"consolidated_data/top_commenters_evolution_fullHistory.csv",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotHistoryFilename := generateHistoryFilename(tt.args.outputFilename, tt.args.dataType, tt.args.isCompare)
+			if gotHistoryFilename != tt.wantHistoryFilename {
+				t.Errorf("generateHistoryFilename() = %v, want %v", gotHistoryFilename, tt.wantHistoryFilename)
 			}
 		})
 	}

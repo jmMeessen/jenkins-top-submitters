@@ -91,6 +91,8 @@ compare it with an extraction with the same settings but with an X amount of mon
 
 		enrichedExtractedData := compareExtractedData(csv_output_slice, csv_offset_output_slice, inputType)
 
+		//FIXME: this seems duplicate with line 76
+
 		//FIXME: change default filename when specifying another type of input
 		// If the default value is specified, update that default with the month being used for the calculation
 		if outputFileName == "top-submitters_YYYY-MM.csv" {
@@ -144,6 +146,7 @@ func init() {
 	compareCmd.PersistentFlags().IntVarP(&period, "period", "p", 12, "Number of months to accumulate.")
 	compareCmd.PersistentFlags().IntVarP(&compareWith, "compare", "c", 3, "Number of months back to compare with.")
 	compareCmd.PersistentFlags().StringVarP(&endMonth, "month", "m", "latest", "Month to extract top submitters.")
+	compareCmd.PersistentFlags().BoolVarP(&isOutputHistory, "history", "", false, "Outputs the available activity history for the top submitters")
 
 	compareCmd.PersistentFlags().BoolVarP(&isVerboseExtract, "verbose", "v", false, "Displays useful info during the extraction")
 }

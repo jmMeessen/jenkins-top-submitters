@@ -40,6 +40,7 @@ var period int
 var endMonth string
 var isVerboseExtract bool
 var argInputType string
+var isOutputHistory bool
 var inputType InputType
 
 type InputType uint8
@@ -106,13 +107,15 @@ the list (resulting in more thant the specified number of top users).
 		// When called standalone, we want to give the minimal information
 		isSilent := true
 
+		inputPivotTableName := args[0]
+
 		// Check input file
-		if !checkFile(args[0], isSilent) {
+		if !checkFile(inputPivotTableName, isSilent) {
 			return fmt.Errorf("Invalid input file.")
 		}
 
 		// Extract the data (with no offset)
-		result, real_endDate, csv_output_slice := extractData(args[0], topSize, endMonth, period, 0, inputType, isVerboseExtract)
+		result, real_endDate, csv_output_slice := extractData(inputPivotTableName, topSize, endMonth, period, 0, inputType, isVerboseExtract)
 		if !result {
 			return fmt.Errorf("Failed to extract data")
 		}
@@ -154,6 +157,17 @@ the list (resulting in more thant the specified number of top users).
 		} else {
 			writeCSVtoFile(outputFileName, csv_output_slice)
 		}
+
+		//TODO: if requested, write the history based the supplied top user slice
+		if isOutputHistory {
+			isCompare := false
+			historyOutputFilename := generateHistoryFilename(outputFileName, inputType, isCompare)
+
+			if err := writeHistoryOutput(historyOutputFilename, inputPivotTableName, csv_output_slice); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	},
 }
@@ -168,6 +182,7 @@ func init() {
 	extractCmd.PersistentFlags().IntVarP(&topSize, "topSize", "t", 35, "Number of top submitters to extract.")
 	extractCmd.PersistentFlags().IntVarP(&period, "period", "p", 12, "Number of months to accumulate.")
 	extractCmd.PersistentFlags().StringVarP(&endMonth, "month", "m", "latest", "Month to extract top submitters.")
+	extractCmd.PersistentFlags().BoolVarP(&isOutputHistory, "history", "", false, "Outputs the available activity history for the top submitters")
 
 	extractCmd.PersistentFlags().BoolVarP(&isVerboseExtract, "verbose", "v", false, "Displays useful info during the extraction")
 }
@@ -179,18 +194,8 @@ func extractData(inputFilename string, topSize int, endMonth string, period int,
 		fmt.Printf("Extracting from \"%s\" the %d top submitters during the last %d months\n\n", inputFilename, topSize, period)
 	}
 
-	//At this stage of the processing, we assume that the input file is correctly formatted
-	f, err := os.Open(inputFilename)
-	if err != nil {
-		log.Printf("Unable to read input file "+inputFilename+"\n", err)
-		return false, "", nil
-	}
-	defer f.Close()
-
-	r := csv.NewReader(f)
-	records, err := r.ReadAll()
-	if err != nil {
-		log.Printf("Unexpected error loading"+inputFilename+"\n", err)
+	records, loadErr := loadInputPivotTable(inputFilename)
+	if loadErr != nil {
 		return false, "", nil
 	}
 
@@ -276,6 +281,25 @@ func extractData(inputFilename string, topSize int, endMonth string, period int,
 	}
 
 	return true, real_endDate, csv_output_slice
+}
+
+// Opens and reads the input as a CSV file
+func loadInputPivotTable(inputFilename string) (loadedRecords [][]string, err error) {
+	//TODO: add some unit tests here ?
+	//At this stage of the processing, we assume that the input file is correctly formatted
+	f, err := os.Open(inputFilename)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to read input file "+inputFilename+"\n", err)
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("Unexpected error loading"+inputFilename+"\n", err)
+	}
+
+	return records, nil
 }
 
 // Based on the number of months requested, computes the start/end column and associated date for the given dataset.
